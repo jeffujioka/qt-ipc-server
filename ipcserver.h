@@ -18,7 +18,6 @@ public:
 public slots:
     void setFileName(const QString& name) { fileName = name; }
     void startListening(const QString& name);
-    void errorString(QString err);
     void finished();
 
 protected:

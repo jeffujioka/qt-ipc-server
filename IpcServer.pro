@@ -9,7 +9,6 @@ CONFIG += c++11
 SOURCES += \
         ipcserver.cpp \
         ipcserverworker.cpp \
-        ipcsocketthread.cpp \
         main.cpp
 
 RESOURCES += qml.qrc
@@ -30,5 +29,4 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     ipcserver.h \
-    ipcserverworker.h \
-    ipcsocketthread.h
+    ipcserverworker.h

@@ -22,12 +22,12 @@ void IpcServerWorker::process() {
 
     qDebug() << "New connection [" << socketDescriptor << "] has arrived. ";
 
-    if (!socket.waitForReadyRead()) {
+    if (!socket.waitForReadyRead()) { // waiting for Client's request
         qDebug() << "socket error: " << socket.error();
         emit error(socket.errorString());
     }
 
-    if (!handleRequest()) {
+    if (!handleRequest()) { // requested received so let's handle it
         emit error("Unexpected error!");
         return;
     }
@@ -48,17 +48,22 @@ bool IpcServerWorker::handleRequest() {
         dsIn >> id;
 
         switch (id) {
+            // received "send request" so let's store the data sent by Client
             case IpcProtReqId::kIpcProtReqIdStore:
         {
             qDebug() << "Request [kIpcProtReqIdStore]";
             uint size;
+            // reading 32-bit representing the number of bytes to receive
+            // from client
             dsIn >> size;
 
-            storeData(size);
+            storeData(size); // receives data from Client and store it into file
             sendAck();
         }
             break;
 
+            // received "get request" so let's read data from file
+            // to send to Client
         case IpcProtReqId::kIpcProtReqIdGet:
         {
             qDebug() << "Request [kIpcProtReqIdGet]";
@@ -89,7 +94,7 @@ void IpcServerWorker::storeData(uint size) {
         goto exit;
     }
 
-    lock.lockForWrite();
+    lock.lockForWrite(); // locking... no one can read from file
 
     while (totalReadBytes < size)
     {
@@ -97,6 +102,7 @@ void IpcServerWorker::storeData(uint size) {
 
         char data[kIpcMaxPayloadLength];
 
+        // read from socket in chunks of kIpcMaxPayloadLength bytes
         auto readBytes = socket.read(data, kIpcMaxPayloadLength);
 
         if (readBytes < 0) {
@@ -110,9 +116,12 @@ void IpcServerWorker::storeData(uint size) {
 
         totalReadBytes += readBytes;
 
+        // write readBytes bytes into file
         file->write(data, readBytes);
 
         if (totalReadBytes < size && dsIn.atEnd()) {
+            // there no enough data to be read so let's wait
+            // the client to send more
             qDebug() << "waiting for more data";
             if (!socket.waitForReadyRead()) {
                 errMsg.append("error waiting more data: ")
@@ -125,12 +134,12 @@ void IpcServerWorker::storeData(uint size) {
              << "totalReadBytes: " << totalReadBytes;
 
     exit:
-    lock.unlock();
+    closeFile();
+    lock.unlock(); // unlocking... file is now free to be read from or written to
     if (!errMsg.isEmpty()) {
         qDebug() << errMsg;
         emit error(errMsg);
     }
-    closeFile();
 }
 
 void IpcServerWorker::getData() {
@@ -144,7 +153,7 @@ void IpcServerWorker::getData() {
         goto exit;
     }
 
-    lock.lockForRead();
+    lock.lockForRead(); // locking... we can now read safely from the file
 
     {
         char buffer[kIpcMaxPayloadLength];
@@ -157,23 +166,26 @@ void IpcServerWorker::getData() {
         socket.write(block); // send file size to the peer
 
         forever {
+            // reads from file chunks of kIpcMaxPayloadLength bytes
             auto readBytes = file->read(buffer, kIpcMaxPayloadLength);
 
+            // then write those data to socket to send to Client
             socket.write(buffer, readBytes);
             totalReadBytes += readBytes;
 
+            // continue reading then writing until reaching readBytes == 0
             if (readBytes == 0) break;
         }
         socket.flush();
     }
 
     exit:
-    lock.unlock();
+    closeFile();
+    lock.unlock(); // unlocking... we can now write safely to the file
     if (!errMsg.isEmpty()) {
         qDebug() << errMsg;
         emit error(errMsg);
     }
-    closeFile();
 }
 
 void IpcServerWorker::sendAck() {

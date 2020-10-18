@@ -4,7 +4,7 @@
 #include <cstdint>
 
 typedef enum class IpcProtReqId : uint8_t {
-    kIpcProtReqIdStore = 156,
+    kIpcProtReqIdStore = 32,
     kIpcProtReqIdGet,
 } IpcProtReqId;
 

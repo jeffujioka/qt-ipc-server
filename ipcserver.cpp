@@ -5,11 +5,14 @@
 #include "ipcserverworker.h"
 
 IpcServer::IpcServer(QObject *parent)
-    : QLocalServer(parent), fileName("log.txt")
-{
+    : QLocalServer(parent), fileName("log.txt") {
 }
 
 void IpcServer::incomingConnection(quintptr socketDescriptor) {
+    // starts a new thread for each incoming connection.
+    // That's not a good solution because it might lead to
+    // thread oversubscription problem
+    // but it suffices the purposes of this example.
     QThread* thread = new QThread;
     IpcServerWorker* worker = new IpcServerWorker(socketDescriptor,
                                                   fileName, lock);
@@ -30,10 +33,6 @@ void IpcServer::startListening(const QString& name) {
         return;
     }
     qDebug() << "Server is listening at [" << name << "]";
-}
-
-void IpcServer::errorString(QString err) {
-    qDebug() << "Error: " << err;
 }
 
 void IpcServer::finished() {
